@@ -1,141 +1,31 @@
-/*
-	MIT License http://www.opensource.org/licenses/mit-license.php
-	Author Scott Beck @bline
-*/
-var coffeelint = require("coffeelint").lint;
-var stripJsonComments = require("strip-json-comments");
-var loaderUtils = require("loader-utils");
-var fs = require("fs");
+const fs = require('fs');
+const loaderUtils = require('loader-utils');
+const coffeelint = require('coffeelint').lint;
+const chalk = require('chalk');
 
+module.exports = function(source) {
+  this.cacheable && this.cacheable();
 
-function loadConfig(options, callback) {
-	var sync = typeof callback !== "function";
-  var path = options.configFile || './coffeelint.json';
-  delete options.configFile;
+  let appDirectory = fs.realpathSync(process.cwd());
+  let sourceFileName = loaderUtils.getRemainingRequest(this)
+        .replace(`${appDirectory}/`, '');
 
-  merge = function (config) {
-    for (name in options)
-      config[name] = options[name];
-    return config;
-  };
+  let path = './coffeelint.json';
+  let file = fs.readFileSync(path, 'utf8');
+  let config = JSON.parse(file);
 
-	if (sync){
-		if (!fs.existsSync(path)) {
-			// no coffeelint.json found
-			return merge({});
-		} else {
-			this.addDependency(path);
-			var file = fs.readFileSync(path, "utf8");
-			return merge(JSON.parse(stripJsonComments(file)));
-		}
-	}
-	else {
-    fs.exists(path, function (exists) {
-      if (!exists) {
-        // no coffeelint.json
-				return callback(null, merge({}));
-			}
+  this.addDependency(path);
 
-			this.addDependency(path);
-			fs.readFile(path, "utf8", function(err, file) {
-				var options;
-				if (!err) {
-					try {
-						options = merge(JSON.parse(stripJsonComments(file)));
-					}
-					catch(e) {
-						err = e;
-					}
-				}
-				callback(err, options);
-			});
-		}.bind(this));
-	}
-}
+  let errs = coffeelint(source, config);
 
-function coffeeLint(input, options) {
+  errs.forEach((e) => {
+    let message = `${e.message} @ ${sourceFileName}:${e.lineNumber}`;
+    this.emitError(chalk.yellow(`CoffeeLint error: ${message}`));
+  });
 
-	// move flags
-	var emitErrors = options.emitErrors;
-	delete options.emitErrors;
-	var failOnErrors = options.failOnErrors;
-	delete options.failOnErrors;
-	var failOnWarns = options.failOnWarns;
-	delete options.failOnWarns;
-
-	// custom reporter
-	var reporter = options.reporter;
-	delete options.reporter;
-
-	var data = coffeelint(input, options);
-  var result = {
-    error: [],
-    warn: []
-  };
-  for (var i = 0; i < data.length; ++i)
-    result[data[i].level] = data[i]
-	if (data.length) {
-		if(reporter) {
-			reporter.call(this, result);
-		} else {
-			var hints = []
-      data.forEach(function (error) {
-				var message = "   " + error.rule + "[" + error.level + "] " + error.message + " @ line " + error.lineNumber + "\n    " + error.context;
-				hints.push(message);
-			}, this);
-			var message = hints.join("\n\n");
-			var emitter = emitErrors ? this.emitError : this.emitWarning;
-			if(emitter)
-				emitter("coffelint results in errors\n" + message);
-			else
-				throw new Error("Your module system doesn't support emitWarning. Update availible? \n" + message);
-		}
-	}
-	if(failOnErrors && result.error.length || failOnWarns && result.warn.length)
-		throw new Error("Module failed in cause of coffeelint error.");
-}
-
-function mergeOptions() {
-  options = {}
-  // copy options to own object
-  if (this.options.coffeelint) {
-    for (var name in this.options.coffeelint) {
-      options[name] = this.options.coffeelint[name];
-    }
+  if (errs.length && process.env.NODE_ENV === 'production') {
+    throw new Error(chalk.red('CoffeeLint failed on style errors.'));
   }
 
-  // copy query into options
-  var query = loaderUtils.parseQuery(this.query);
-  for (var name in query) {
-    options[name] = query[name];
-  }
-  return options;
-}
-
-module.exports = function(input) {
-	this.cacheable && this.cacheable();
-	var callback = this.async();
-
-  options = mergeOptions.call(this);
-	if(!callback) {
-		// load coffeelint.json synchronously
-		var config = loadConfig.call(this, options);
-		coffeeLint.call(this, input, config);
-		return input;
-	}
-
-	// load coffeelint.json asynchronously
-	loadConfig.call(this, options, function(err, config) {
-		if(err) return callback(err);
-
-		try {
-			coffeeLint.call(this, input, config);
-		}
-		catch(e) {
-			return callback(e);
-		}
-		callback(null, input);
-
-	}.bind(this));
-}
-
+  return source;
+};
