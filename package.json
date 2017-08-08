@@ -1,24 +1,19 @@
 {
 	"name": "coffeelint-loader",
 	"version": "0.0.1",
+	"license": "MIT",
 	"contributors": [
 		"Scott Beck (http://github.com/bline)",
 		"Benjamin Zalasky <benjamin.zalasky@lookout.com> (http://github.com/bzalasky)"
 	],
 	"description": "CoffeeLint loader for webpack",
 	"dependencies": {
-		"chalk": "2.0.1",
+		"chalk": "2.1.0",
 		"coffeelint": "1.16.0",
 		"loader-utils": "^1.1.0"
 	},
 	"repository": {
 		"type": "git",
 		"url": "git@github.com:bzalasky/coffeelint-loader.git"
-	},
-	"licenses": [
-		{
-			"type": "MIT",
-			"url": "http://www.opensource.org/licenses/mit-license.php"
-		}
-	]
+	}
 }
